@@ -27,7 +27,7 @@ CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results.csv
 
 
 def plot_paths(solution, title="MCBS Paths"):
-    """Plot UAV paths in XY plane."""
+    """Plot UAV paths in XY plane with clear direction arrows."""
     if not HAS_PLT:
         print("(matplotlib not installed, skipping plot)")
         return
@@ -35,24 +35,64 @@ def plot_paths(solution, title="MCBS Paths"):
         print("No solution to plot.")
         return
 
-    colors = ["blue", "orange", "green", "purple", "cyan", "magenta"]
+    colors = ["blue", "orange", "green", "purple", "cyan", "magenta", "brown", "pink"]
     plt.figure(figsize=(8, 8))
 
+    # 1. 绘制路径线 + 方向箭头
     for idx, path in enumerate(solution):
+        if len(path) < 2:
+            continue
         xs = [point[0] for point in path]
         ys = [point[1] for point in path]
         color = colors[idx % len(colors)]
-        plt.plot(xs, ys, marker="o", markersize=2, color=color, label=f"UAV {idx}")
-        plt.plot(xs[0], ys[0], marker="*", color="green", markersize=12,
-                 label=f"Start {idx}" if idx == 0 else "")
-        plt.plot(xs[-1], ys[-1], marker="*", color="red", markersize=12,
-                 label=f"Goal {idx}" if idx == 0 else "")
+
+        # 绘制路径线（带小圆点标记，方便看清路径节点）
+        plt.plot(xs, ys, marker='.', markersize=2, color=color,
+                 label=f"UAV {idx}", linewidth=2)
+
+        # ---- 沿路径添加 3 个方向箭头 ----
+        total_len = len(path)
+        # 在 1/4, 1/2, 3/4 位置各取一个点
+        arrow_positions = [int(total_len * 0.25), int(total_len * 0.5), int(total_len * 0.75)]
+        for pos in arrow_positions:
+            # 确保不越界，且取当前位置的下一个点计算方向
+            if pos >= total_len - 1:
+                pos = total_len - 2
+            if pos < 0:
+                pos = 0
+
+            p1 = path[pos]      # 当前点 (x, y, z, t)
+            p2 = path[pos + 1]  # 下一个点 (x, y, z, t)
+            dx = p2[0] - p1[0]
+            dy = p2[1] - p1[1]
+            norm = math.sqrt(dx*dx + dy*dy)
+            if norm > 0:
+                # 将箭头长度固定为 1.5 个单位，避免箭头太长或太短
+                dx = dx / norm * 1.5
+                dy = dy / norm * 1.5
+                # 使用 quiver 绘制箭头
+                plt.quiver(p1[0], p1[1], dx, dy,
+                           angles='xy', scale_units='xy', scale=1,
+                           color=color, width=0.008, headwidth=4,
+                           headlength=5, alpha=0.8)
+
+    # 2. 统一绘制所有起点（绿色五角星）
+    start_xs = [path[0][0] for path in solution]
+    start_ys = [path[0][1] for path in solution]
+    plt.scatter(start_xs, start_ys, marker='*', color='green',
+                s=150, label='Starts', zorder=5)
+
+    # 3. 统一绘制所有终点（红色五角星）
+    goal_xs = [path[-1][0] for path in solution]
+    goal_ys = [path[-1][1] for path in solution]
+    plt.scatter(goal_xs, goal_ys, marker='*', color='red',
+                s=150, label='Goals', zorder=5)
 
     plt.title(title)
     plt.xlabel("X")
     plt.ylabel("Y")
     plt.grid(True)
-    plt.legend()
+    plt.legend(loc='best')
     plt.axis("equal")
     plt.show()
 
@@ -312,7 +352,10 @@ if __name__ == "__main__":
 
     else:
         # ===== 交互模式：默认使用 parallel_3 场景，保证快速成功 =====
-        scene = PRESET_SCENARIOS["parallel_3"]
+        # 两机情况
+        # scene = PRESET_SCENARIOS["crossing_2"] 
+        # 三机情况
+        scene = PRESET_SCENARIOS["crossing_3"]
         start_list = scene["starts"]
         goal_list = scene["goals"]
         num_agents = len(start_list)
