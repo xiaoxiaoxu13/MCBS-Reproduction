@@ -1,0 +1,6 @@
+# 不备份这些大型垃圾文件
+*.log
+*.pth
+*.mat
+__pycache__/
+results/
